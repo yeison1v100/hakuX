@@ -55,8 +55,9 @@ jobs:
       - name: APK
         working-directory: android
         run: |
+          sed -i '/org.gradle.java.home/d' gradle.properties
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug -Dorg.gradle.java.home="$JAVA_HOME"
 
       - uses: actions/upload-artifact@v4
         with:
