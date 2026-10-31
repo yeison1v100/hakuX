@@ -20,14 +20,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ninja-build cmake
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
-            "platforms;android-36" "build-tools;36.1.0" "ndk;29.0.14206865"
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-36" "build-tools;36.1.0" "ndk;29.0.14206865"
 
       - name: Submódulos FEX
         run: |
           git submodule update --init external/fex
-          git -C external/fex submodule update --init External/fmt External/range-v3 \
-            External/rpmalloc External/unordered_dense External/xxhash Source/Common/cpp-optparse
+          git -C external/fex submodule update --init External/fmt External/range-v3 External/rpmalloc External/unordered_dense External/xxhash Source/Common/cpp-optparse
 
       - name: Dependencias (NC_DEPS)
         run: |
@@ -35,25 +33,32 @@ jobs:
           D=$HOME/deps
           mkdir -p $D/root/subprojects
           cd $D
-
           git clone --depth 1 -b 1.4.304 https://github.com/zeux/volk volk
           git clone --depth 1 -b 16.1.0 https://github.com/KhronosGroup/glslang glslang
           git clone --depth 1 -b vulkan-sdk-1.4.328.0 https://github.com/KhronosGroup/SPIRV-Reflect spirv_reflect
           git clone --depth 1 -b v3.3.0 https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator vma
           git clone --depth 1 -b release-3.4.18 https://github.com/libsdl-org/SDL SDL3
-
           git clone --recursive https://github.com/bylaws/libadrenotools adrenotools
           git -C adrenotools checkout 8fae8ce
           git -C adrenotools submodule update --init --recursive
           git -C adrenotools apply $GITHUB_WORKSPACE/tools/native/adrenotools-kgsl-context-priority.patch
+          git clone https://github.com/abaire/nv2a_vsh_cpu $D/root/subprojects/nv2a_vsh_cpu
+          git clone https://gitlab.freedesktop.org/slirp/libslirp libslirp && git -C libslirp checkout 26be815b
 
-          N=$D/root/subprojects/nv2a_vsh_cpu
-          for U in https://github.com/xemu-project/nv2a_vsh_cpu https://github.com/abaire/nv2a_vsh_cpu; do
-            rm -rf $N
-            git clone $U $N
-            if git -C $N checkout 561fe80; then echo "OK desde $U"; break; fi
-          done
-          git -C $N log --oneline -3
+      - name: Core nativo
+        run: |
+          NDK=$ANDROID_HOME/ndk/29.0.14206865
+          cmake -S native -B build/native/core -G Ninja -DCMAKE_TOOLCHAIN_FILE=$NDK/build/cmake/android.toolchain.cmake -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-28 -DCMAKE_BUILD_TYPE=Release -DNC_DEPS=$HOME/deps
+          ninja -C build/native/core hakuxcore
+          bash tools/native/app-libs.sh
 
-          git clone https://gitlab.freedesktop.org/slirp/libslirp libslirp
-          g
+      - name: APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hakux-apk
+          path: android/app/build/outputs/apk/debug/*.apk
