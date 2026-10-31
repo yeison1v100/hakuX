@@ -1,42 +1,62 @@
-name: build
+name: build-hakux
 on: workflow_dispatch
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
         with:
           ref: mali-custom-driver
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 21
-      - name: SDK/NDK
+
+      - name: SDK y NDK
         run: |
-          sudo apt-get install -y ninja-build
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses >/dev/null
+          sudo apt-get update
+          sudo apt-get install -y ninja-build cmake
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null
           $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
             "platforms;android-36" "build-tools;36.1.0" "ndk;29.0.14206865"
+
       - name: Submódulos FEX
         run: |
           git submodule update --init external/fex
           git -C external/fex submodule update --init External/fmt External/range-v3 \
             External/rpmalloc External/unordered_dense External/xxhash Source/Common/cpp-optparse
+
       - name: Dependencias (NC_DEPS)
         run: |
-          D=$HOME/deps; mkdir -p $D/root/subprojects; cd $D
+          git config --global advice.detachedHead false
+          D=$HOME/deps
+          mkdir -p $D/root/subprojects
+          cd $D
+
           git clone --depth 1 -b 1.4.304 https://github.com/zeux/volk volk
           git clone --depth 1 -b 16.1.0 https://github.com/KhronosGroup/glslang glslang
           git clone --depth 1 -b vulkan-sdk-1.4.328.0 https://github.com/KhronosGroup/SPIRV-Reflect spirv_reflect
           git clone --depth 1 -b v3.3.0 https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator vma
           git clone --depth 1 -b release-3.4.18 https://github.com/libsdl-org/SDL SDL3
+
           git clone --recursive https://github.com/bylaws/libadrenotools adrenotools
           git -C adrenotools checkout 8fae8ce
           git -C adrenotools submodule update --init --recursive
           git -C adrenotools apply $GITHUB_WORKSPACE/tools/native/adrenotools-kgsl-context-priority.patch
-          git clone https://github.com/xemu-project/nv2a_vsh_cpu root/subprojects/nv2a_vsh_cpu
-          git -C root/subprojects/nv2a_vsh_cpu checkout 561fe80
+
+          N=$D/root/subprojects/nv2a_vsh_cpu
+          for U in https://github.com/xemu-project/nv2a_vsh_cpu https://github.com/abaire/nv2a_vsh_cpu; do
+            rm -rf $N
+            git clone $U $N
+            if git -C $N checkout 561fe80; then echo "OK desde $U"; break; fi
+          done
+          git -C $N log --oneline -3
+
           git clone -b v4.7.0 https://gitlab.freedesktop.org/slirp/libslirp libslirp
+
       - name: Core nativo
         run: |
           NDK=$ANDROID_HOME/ndk/29.0.14206865
@@ -46,9 +66,13 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release -DNC_DEPS=$HOME/deps
           ninja -C build/native/core hakuxcore
           bash tools/native/app-libs.sh
+
       - name: APK
         working-directory: android
-        run: ./gradlew assembleDebug
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
       - uses: actions/upload-artifact@v4
         with:
           name: hakux-apk
