@@ -55,25 +55,5 @@ jobs:
           done
           git -C $N log --oneline -3
 
-          git clone -b v4.7.0 https://gitlab.freedesktop.org/slirp/libslirp libslirp
-
-      - name: Core nativo
-        run: |
-          NDK=$ANDROID_HOME/ndk/29.0.14206865
-          cmake -S native -B build/native/core -G Ninja \
-            -DCMAKE_TOOLCHAIN_FILE=$NDK/build/cmake/android.toolchain.cmake \
-            -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-28 \
-            -DCMAKE_BUILD_TYPE=Release -DNC_DEPS=$HOME/deps
-          ninja -C build/native/core hakuxcore
-          bash tools/native/app-libs.sh
-
-      - name: APK
-        working-directory: android
-        run: |
-          chmod +x gradlew
-          ./gradlew assembleDebug
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: hakux-apk
-          path: android/app/build/outputs/apk/debug/*.apk
+          git clone https://gitlab.freedesktop.org/slirp/libslirp libslirp
+          g
