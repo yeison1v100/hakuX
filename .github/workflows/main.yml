@@ -34,7 +34,7 @@ jobs:
           git -C adrenotools checkout 8fae8ce
           git -C adrenotools submodule update --init --recursive
           git -C adrenotools apply $GITHUB_WORKSPACE/tools/native/adrenotools-kgsl-context-priority.patch
-          git clone https://github.com/abaire/nv2a_vsh_cpu root/subprojects/nv2a_vsh_cpu
+          git clone https://github.com/xemu-project/nv2a_vsh_cpu root/subprojects/nv2a_vsh_cpu
           git -C root/subprojects/nv2a_vsh_cpu checkout 561fe80
           git clone -b v4.7.0 https://gitlab.freedesktop.org/slirp/libslirp libslirp
       - name: Core nativo
